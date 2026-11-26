@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, NavLink, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { Activity, ClipboardList, FolderOpen, LogOut, Monitor } from 'lucide-react'
+import { Activity, ClipboardList, FileDown, FolderOpen, LogOut, MessageSquare, Monitor, PhoneCall, Star } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { api, unwrap } from '../services/api'
 import { useDashboard } from '../services/useDashboard'
@@ -37,6 +37,10 @@ export function AdminLayout({ children }) {
           {isAdmin && <NavLink to="/admin/dashboard"><Activity size={18} aria-hidden="true" /> Indicadores</NavLink>}
           <NavLink to={isAdmin ? '/admin/perguntas' : '/setor/perguntas'}><ClipboardList size={18} aria-hidden="true" /> {isAdmin ? 'Perguntas' : 'Minhas propostas'}</NavLink>
           {isAdmin && <NavLink to="/admin/cadastros"><FolderOpen size={18} aria-hidden="true" /> Cadastros</NavLink>}
+          {isAdmin && <NavLink to="/admin/avaliacoes"><Star size={18} aria-hidden="true" /> Avaliações</NavLink>}
+          <NavLink to={isAdmin ? '/admin/feedback' : '/setor/feedback'}><MessageSquare size={18} aria-hidden="true" /> Feedbacks</NavLink>
+          {isAdmin && <NavLink to="/admin/retornos"><PhoneCall size={18} aria-hidden="true" /> Retornos</NavLink>}
+          {isAdmin && <NavLink to="/admin/relatorios"><FileDown size={18} aria-hidden="true" /> Relatórios</NavLink>}
           <Link to="/tvwall"><Monitor size={18} aria-hidden="true" /> Painel público</Link>
         </nav>
         <button className="side-exit" onClick={signOut}><LogOut size={18} aria-hidden="true" /> Sair</button>
@@ -66,7 +70,7 @@ export function Dashboard() {
   ]
   return (
     <AdminLayout>
-      <header className="section-heading"><h1>Indicadores</h1><p>Resumo acumulado das avaliações registradas.</p></header>
+      <header className="section-heading"><h1>Indicadores</h1><p>Resumo acumulado das pesquisas concluídas.</p></header>
       <Notice error={summary.error} loading={summary.isLoading} />
       <div className="statgrid">
         {stats.map(([label, value]) => <article className="stat" key={label}><span>{label}</span><strong>{value}</strong></article>)}
