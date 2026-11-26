@@ -7,7 +7,7 @@ import { AuthProvider } from './contexts/AuthContext'
 import { SurveyProvider } from './contexts/SurveyContext'
 import './styles.css'
 async function bootstrap() {
-  if (import.meta.env.VITE_ENABLE_MOCKS !== 'false') { const { worker } = await import('./mocks/browser'); await worker.start({ onUnhandledRequest: 'bypass' }) }
+  if (import.meta.env.DEV && import.meta.env.VITE_ENABLE_MOCKS === 'true') { const { worker } = await import('./mocks/browser'); await worker.start({ onUnhandledRequest: 'bypass' }) }
   createRoot(document.getElementById('root')).render(<React.StrictMode><QueryClientProvider client={new QueryClient()}><BrowserRouter><AuthProvider><SurveyProvider><App /></SurveyProvider></AuthProvider></BrowserRouter></QueryClientProvider></React.StrictMode>)
 }
 bootstrap()
