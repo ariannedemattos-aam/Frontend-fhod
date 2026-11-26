@@ -119,3 +119,20 @@ button:disabled{opacity:.64;cursor:not-allowed}
   .analysis-fields{grid-template-columns:repeat(auto-fit,minmax(min(130px,100%),1fr))}
   .evaluation-detail .toolbar{align-items:start}
 }
+
+.topbar-tools,.notification-meta{display:flex;align-items:center;gap:10px}
+.notification-bell{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;position:relative;border:1px solid var(--line);border-radius:10px;text-decoration:none}
+.notification-bell span{position:absolute;top:-5px;right:-5px;background:var(--navy);color:white;padding:0 5px;line-height:20px;min-width:20px;text-align:center;border-radius:20px;font-size:.75rem}
+.notification-list{list-style:none;padding:0;display:grid;gap:12px}
+.notification-list li[data-unread=true]{border-inline-start:4px solid var(--blue)}
+.notification-list h2,.invitation-result h2{color:var(--navy);font-size:1.22rem;margin:6px 0}
+.notification-meta{justify-content:space-between;color:var(--muted);font-size:.86rem}
+.invitation-result{display:grid;grid-template-columns:minmax(0,1fr) minmax(190px,280px);gap:18px;margin:16px 0}
+.invitation-result .toolbar{justify-content:flex-start}
+.invitation-result button,.invitation-result a,.analysis-filters .primary,.notification-list button{gap:8px}
+.invitation-result .form-card{box-shadow:none}
+.invitation-qr{margin:0;align-self:start;text-align:center}
+.invitation-qr img{display:block;width:min(100%,250px);height:auto;margin:0 auto 12px;border:1px solid var(--line);border-radius:12px;background:white}
+.invitation-used{background:#eaf4fa;color:var(--navy)}
+.invitation-expired{background:#fff3cd;color:#604a00}
+@media(max-width:700px){.invitation-result{grid-template-columns:1fr}.topbar-tools{gap:6px}}

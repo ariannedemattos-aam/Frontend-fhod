@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, NavLink, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { Activity, ClipboardList, FileDown, FolderOpen, LogOut, MessageSquare, Monitor, PhoneCall, Star } from 'lucide-react'
+import { Activity, ClipboardList, FileDown, FolderOpen, Link2, LogOut, MessageSquare, Monitor, PhoneCall, Star } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { api, unwrap } from '../services/api'
 import { useDashboard } from '../services/useDashboard'
 import { Notice, Pagination, SearchField, Success } from './AdminFeedback'
+import { NotificationBell } from './NotificationControls'
 
 const dimensions = { sectors: 'Setores', services: 'Serviços', stages: 'Etapas', teams: 'Equipes', shifts: 'Turnos' }
 const questionTypes = { rating: 'Avaliação de 1 a 5', text: 'Texto livre', single_choice: 'Escolha única', multiple_choice: 'Múltipla escolha' }
@@ -41,12 +42,13 @@ export function AdminLayout({ children }) {
           <NavLink to={isAdmin ? '/admin/feedback' : '/setor/feedback'}><MessageSquare size={18} aria-hidden="true" /> Feedbacks</NavLink>
           {isAdmin && <NavLink to="/admin/retornos"><PhoneCall size={18} aria-hidden="true" /> Retornos</NavLink>}
           {isAdmin && <NavLink to="/admin/relatorios"><FileDown size={18} aria-hidden="true" /> Relatórios</NavLink>}
+          {isAdmin && <NavLink to="/admin/convites"><Link2 size={18} aria-hidden="true" /> Convites</NavLink>}
           <Link to="/tvwall"><Monitor size={18} aria-hidden="true" /> Painel público</Link>
         </nav>
         <button className="side-exit" onClick={signOut}><LogOut size={18} aria-hidden="true" /> Sair</button>
       </aside>
       <main className="content">
-        <div className="topbar"><span>{user?.name}</span><span className="badge">{isAdmin ? 'Administração' : 'Equipe de setor'}</span></div>
+        <div className="topbar"><span>{user?.name}</span><div className="topbar-tools"><span className="badge">{isAdmin ? 'Administração' : 'Equipe de setor'}</span><NotificationBell /></div></div>
         {children}
       </main>
     </div>
