@@ -6,7 +6,7 @@ import { useAuth } from '../contexts/AuthContext'
 
 const queryKey = ['dashboard-overview']
 
-export function useDashboard() {
+export function useDashboard(filters) {
   const queryClient = useQueryClient()
   const socketUrl = import.meta.env.VITE_SOCKET_URL
   const { token } = useAuth()
@@ -23,8 +23,8 @@ export function useDashboard() {
   }, [queryClient, socketUrl, token])
 
   return useQuery({
-    queryKey,
-    queryFn: () => api.get('/admin/dashboard/overview').then(unwrap),
+    queryKey: [...queryKey, filters],
+    queryFn: () => api.get('/admin/dashboard/overview', { params: filters }).then(unwrap),
     refetchInterval: 30000,
   })
 }

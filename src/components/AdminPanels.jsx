@@ -34,6 +34,7 @@ export function AdminLayout({ children }) {
   }
   return (
     <div className="admin">
+      <a className="skip-link" href="#admin-content">Ir ao conteúdo</a>
       <aside className="side">
         <Link to="/" className="side-brand"><Activity size={22} aria-hidden="true" /> FHDOD Ouvidoria</Link>
         <nav aria-label="Menu de colaboradores">
@@ -51,7 +52,7 @@ export function AdminLayout({ children }) {
         </nav>
         <button className="side-exit" onClick={signOut}><LogOut size={18} aria-hidden="true" /> Sair</button>
       </aside>
-      <main className="content">
+      <main id="admin-content" className="content" tabIndex={-1}>
         <div className="topbar"><span>{user?.name}</span><div className="topbar-tools"><span className="badge">{labels[user?.role] ?? 'Colaborador'}</span><NotificationBell /></div></div>
         {children}
       </main>
@@ -60,11 +61,16 @@ export function AdminLayout({ children }) {
 }
 
 export function Dashboard() {
-  const summary = useDashboard()
   const [dimension, setDimension] = useState('sectors')
-  const [period, setPeriod] = useState({})
+  const [filters, setFilters] = useState({})
+  const [sector, setSector] = useState('')
   const byRoster = dimension === 'roster-teams'
-  const filters = byRoster ? period : undefined
+  const summary = useDashboard(filters)
+  const options = useQuery({ queryKey: ['dashboard-options'], queryFn: () => api.get('/admin/dashboard/options').then(unwrap) })
+  const apply = event => {
+    event.preventDefault()
+    setFilters(Object.fromEntries([...new FormData(event.currentTarget)].filter(([,value])=>value)))
+  }
   const { data = [], error, isLoading } = useQuery({
     queryKey: ['dashboard-dimension', dimension, filters],
     queryFn: () => api.get('/admin/dashboard/' + dimension, { params: filters }).then(unwrap),
@@ -79,8 +85,29 @@ export function Dashboard() {
   ]
   return (
     <AdminLayout>
-      <header className="section-heading"><h1>Indicadores</h1><p>Resumo acumulado das pesquisas concluídas.</p></header>
-      <Notice error={summary.error} loading={summary.isLoading} />
+      <header className="section-heading"><h1>Indicadores</h1><p>Pesquisa de satisfação da Fundação Hospitalar Dr. Oswaldo Diesel.</p></header>
+      <form className="card analysis-filters dashboard-filters" aria-label="Filtros dos indicadores" onSubmit={apply}>
+        <div className="analysis-fields">
+          <label className="field">Data inicial<input name="from" type="date" /></label>
+          <label className="field">Data final<input name="to" type="date" /></label>
+          <label className="field">Setor<select name="sectorId" value={sector} onChange={event=>setSector(event.target.value)}>
+            <option value="">Todos</option>{options.data?.sectors.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}
+          </select></label>
+          <label className="field">Turno<select name="shiftId"><option value="">Todos</option>
+            {options.data?.shifts.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}
+          </select></label>
+          <label className="field">Serviço<select key={'service-'+sector} name="serviceId"><option value="">Todos</option>
+            {options.data?.services.filter(item=>!sector||item.sectorId===sector).map(item=><option key={item.id} value={item.id}>{item.name}</option>)}
+          </select></label>
+          <label className="field">Equipe da escala<select key={'team-'+sector} name="teamId"><option value="">Todas</option>
+            {options.data?.teams.filter(item=>!sector||item.sectorId===sector).map(item=><option key={item.id} value={item.id}>{item.name}</option>)}
+          </select></label>
+        </div>
+        <p>O período usa a conclusão da pesquisa no resumo e a data do atendimento nas equipes da escala.</p>
+        <div className="toolbar"><button className="primary" type="submit">Aplicar filtros</button>
+          <button className="secondary" type="reset" onClick={()=>{setSector('');setFilters({})}}>Limpar filtros</button></div>
+      </form>
+      <Notice error={options.error||summary.error} loading={summary.isLoading} />
       <div className="statgrid">
         {stats.map(([label, value]) => <article className="stat" key={label}><span>{label}</span><strong>{value}</strong></article>)}
       </div>
@@ -90,13 +117,7 @@ export function Dashboard() {
             {Object.entries(dimensions).map(([key, label]) => <option value={key} key={key}>{label}</option>)}
           </select></label>
         </div>
-        {byRoster && <>
-          <div className="toolbar">
-            <label className="field">Data do atendimento inicial<input type="date" value={period.from ?? ''} onChange={event=>setPeriod({...period,from:event.target.value||undefined})}/></label>
-            <label className="field">Data do atendimento final<input type="date" value={period.to ?? ''} onChange={event=>setPeriod({...period,to:event.target.value||undefined})}/></label>
-          </div>
-          <p>A nota geral é anônima e aparece a partir de três avaliações vinculadas à equipe.</p>
-        </>}
+        {byRoster && <p>A nota geral é anônima e aparece a partir de três avaliações vinculadas à equipe.</p>}
         <Notice error={error} loading={isLoading} empty={!data.length && 'Ainda não há respostas vinculadas a esta dimensão.'} />
         <div className="bar-list">
           {data.map((row, index) => {
