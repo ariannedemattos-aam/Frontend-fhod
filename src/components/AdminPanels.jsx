@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, NavLink, useNavigate } from 'react-router-dom'
-import { Activity, ClipboardList, LogOut, Monitor } from 'lucide-react'
+import { Link, NavLink, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { Activity, ClipboardList, FolderOpen, LogOut, Monitor } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { api, unwrap } from '../services/api'
 import { useDashboard } from '../services/useDashboard'
+import { Notice, Pagination, SearchField, Success } from './AdminFeedback'
 
 const dimensions = { sectors: 'Setores', services: 'Serviços', stages: 'Etapas', teams: 'Equipes', shifts: 'Turnos' }
 const questionTypes = { rating: 'Avaliação de 1 a 5', text: 'Texto livre', single_choice: 'Escolha única', multiple_choice: 'Múltipla escolha' }
@@ -12,12 +13,6 @@ const statuses = { pending: 'Pendente', active: 'Ativa', rejected: 'Rejeitada', 
 const numberFormat = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 })
 const format = (value) => value == null ? '—' : numberFormat.format(Number(value))
 const queryQuestions = ['question-catalog']
-
-function Notice({ error, loading, empty }) {
-  if (error) return <p className="error" role="alert">{error.message}</p>
-  if (loading) return <p className="state" role="status">Carregando…</p>
-  return empty ? <p className="state">{empty}</p> : null
-}
 
 export function AdminLayout({ children }) {
   const { logout, user } = useAuth()
@@ -41,6 +36,7 @@ export function AdminLayout({ children }) {
         <nav aria-label="Menu de colaboradores">
           {isAdmin && <NavLink to="/admin/dashboard"><Activity size={18} aria-hidden="true" /> Indicadores</NavLink>}
           <NavLink to={isAdmin ? '/admin/perguntas' : '/setor/perguntas'}><ClipboardList size={18} aria-hidden="true" /> {isAdmin ? 'Perguntas' : 'Minhas propostas'}</NavLink>
+          {isAdmin && <NavLink to="/admin/cadastros"><FolderOpen size={18} aria-hidden="true" /> Cadastros</NavLink>}
           <Link to="/tvwall"><Monitor size={18} aria-hidden="true" /> Painel público</Link>
         </nav>
         <button className="side-exit" onClick={signOut}><LogOut size={18} aria-hidden="true" /> Sair</button>
@@ -94,12 +90,13 @@ export function Dashboard() {
   )
 }
 
-function ReviewQuestion({ id, onClose }) {
+function ReviewQuestion({ id, onClose, onSaved }) {
   const client = useQueryClient()
   const [action, setAction] = useState('approve')
   const review = useMutation({
     mutationFn: (justification) => api.post('/questions/' + id + '/' + action, { justification }),
-    onSuccess: async () => {
+    onSuccess: async result => {
+      onSaved(result.message)
       await client.invalidateQueries({ queryKey: queryQuestions })
       onClose()
     },
@@ -118,79 +115,141 @@ function ReviewQuestion({ id, onClose }) {
 }
 
 export function QuestionsAdmin({ sector = false }) {
-  const [filter, setFilter] = useState('')
+  const client = useQueryClient()
+  const location = useLocation()
+  const [filters, setFilters] = useState({ status: '', search: '', page: 1 })
   const [review, setReview] = useState(null)
-  const { data = [], error, isLoading } = useQuery({
-    queryKey: queryQuestions,
-    queryFn: () => api.get('/questions').then(unwrap),
+  const [confirm, setConfirm] = useState(null)
+  const [message, setMessage] = useState(location.state?.message ?? '')
+  const confirmation = useRef(null)
+  const home = sector ? '/setor/perguntas' : '/admin/perguntas'
+  const query = useQuery({
+    queryKey: [...queryQuestions, filters],
+    queryFn: () => api.get('/questions', { params: { ...filters, status: filters.status || undefined, limit: 15 } }),
   })
-  const rows = data.filter(item => !filter || item.status === filter)
+  const status = useMutation({
+    mutationFn: item => api.patch('/questions/' + item.id + '/status', { active: item.status === 'inactive' }),
+    onSuccess: async response => {
+      setMessage(response.message)
+      setConfirm(null)
+      await client.invalidateQueries({ queryKey: queryQuestions })
+    },
+  })
+  const table = query.data
+  const rows = table?.data ?? []
+  const updateFilters = changes => setFilters(current => ({ ...current, page: 1, ...changes }))
+  useEffect(() => {
+    const last = Math.max(table?.pagination?.totalPages ?? 1, 1)
+    if (table?.pagination && filters.page > last) setFilters(current => ({ ...current, page: last }))
+  }, [filters.page, table])
+  useEffect(() => { if (confirm) confirmation.current?.focus() }, [confirm])
   return (
     <AdminLayout>
       <header className="section-heading"><h1>{sector ? 'Minhas propostas de perguntas' : 'Gerenciar perguntas'}</h1>
         <p>{sector ? 'Acompanhe as propostas dos atendimentos do seu setor.' : 'Revise propostas e acompanhe as perguntas de cada serviço.'}</p>
       </header>
-      <div className="toolbar">
-        <label className="field">Status<select value={filter} onChange={event => setFilter(event.target.value)}>
+      <div className="toolbar catalog-toolbar">
+        <SearchField label="Buscar por pergunta" value={filters.search} onSearch={search => updateFilters({ search })} />
+        <label className="field">Status<select value={filters.status} onChange={event => updateFilters({ status: event.target.value })}>
           <option value="">Todos</option>{Object.entries(statuses).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
         </select></label>
-        <Link className="primary" to={sector ? '/setor/perguntas/nova' : '/admin/perguntas/nova'}>Nova pergunta</Link>
+        <Link className="primary" to={home + '/nova'}>Nova pergunta</Link>
       </div>
-      <Notice error={error} loading={isLoading} empty={!rows.length && 'Nenhuma pergunta encontrada para este status.'} />
-      {rows.length > 0 && <div className="table-scroll"><table className="table"><thead><tr>
-        <th scope="col">Pergunta</th><th scope="col">Serviço</th><th scope="col">Status</th>{!sector && <th scope="col">Ação</th>}
+      <Success message={message} />
+      {confirm && <div ref={confirmation} tabIndex={-1} className="card form-card" role="region" aria-label="Confirmar status da pergunta">
+        <p>{confirm.status === 'active'
+          ? 'Arquivar esta pergunta? As pesquisas já iniciadas manterão a versão original.'
+          : 'Devolver a pergunta à revisão? Ela voltará às pesquisas após nova aprovação.'}</p>
+        <Notice error={status.error} />
+        <div className="toolbar">
+          <button type="button" className="secondary" disabled={status.isPending} onClick={() => { setConfirm(null); status.reset() }}>Cancelar</button>
+          <button type="button" className="primary" disabled={status.isPending} onClick={() => status.mutate(confirm)}>{status.isPending ? 'Salvando…' : 'Confirmar'}</button>
+        </div>
+      </div>}
+      <Notice error={query.error} loading={query.isLoading} empty={table && !rows.length && 'Nenhuma pergunta encontrada.'} />
+      {rows.length > 0 && <div className="table-scroll" tabIndex={0} role="region" aria-label="Tabela de perguntas"><table className="table"><thead><tr>
+        <th scope="col">Pergunta</th><th scope="col">Serviço</th><th scope="col">Status</th><th scope="col">Ações</th>
       </tr></thead><tbody>{rows.map(item => <tr key={item.id}>
-        <td>{item.prompt}<small>{questionTypes[item.type]}</small></td><td>{item.services || 'Geral'}</td>
+        <td>{item.prompt}<small>{questionTypes[item.type]} · Versão {item.version ?? 1}</small></td>
+        <td>{item.services || 'Geral'}</td>
         <td><span className={'badge status-' + item.status}>{statuses[item.status]}</span></td>
-        {!sector && <td>{item.status === 'pending' && (review === item.id
-          ? <ReviewQuestion id={item.id} onClose={() => setReview(null)} />
-          : <button className="secondary" onClick={() => setReview(item.id)}>Revisar</button>)}</td>}
+        <td><div className="row-actions">
+          {item.canEdit && <Link className="secondary" to={home + '/' + item.id + '/editar'}>Editar</Link>}
+          {!sector && item.status === 'pending' && review !== item.id &&
+            <button className="secondary" type="button" onClick={() => { setReview(item.id); setConfirm(null) }}>Revisar</button>}
+          {!sector && item.canEdit && ['active', 'inactive'].includes(item.status) &&
+            <button className="secondary" type="button" onClick={() => { setConfirm(item); setReview(null); setMessage(''); status.reset() }}>
+              {item.status === 'active' ? 'Arquivar' : 'Reabrir revisão'}
+            </button>}
+        </div>
+        {!sector && item.status === 'pending' && review === item.id &&
+          <ReviewQuestion id={item.id} onSaved={setMessage} onClose={() => setReview(null)} />}</td>
       </tr>)}</tbody></table></div>}
+      <Pagination pagination={table?.pagination} disabled={query.isFetching} onPage={page => updateFilters({ page })} />
     </AdminLayout>
   )
 }
 
-export function NewQuestion({ sector = false }) {
+function QuestionForm({ entry, services, home }) {
   const nav = useNavigate()
   const client = useQueryClient()
-  const [type, setType] = useState('rating')
-  const { data: services = [], error, isLoading } = useQuery({
-    queryKey: ['question-services'],
-    queryFn: () => api.get('/questions/services').then(unwrap),
-  })
+  const [type, setType] = useState(entry?.type ?? 'rating')
+  const choice = type.endsWith('_choice')
   const save = useMutation({
-    mutationFn: (data) => api.post('/questions', data),
-    onSuccess: async () => {
+    mutationFn: data => entry ? api.put('/questions/' + entry.id, data) : api.post('/questions', data),
+    onSuccess: async response => {
       await client.invalidateQueries({ queryKey: queryQuestions })
-      nav(sector ? '/setor/perguntas' : '/admin/perguntas')
+      nav(home, { state: { message: response.message } })
     },
   })
-  const choice = type.endsWith('_choice')
   return (
-    <AdminLayout>
-      <header className="section-heading"><h1>Nova pergunta</h1><p>A pergunta fica pendente até a análise da administração.</p></header>
-      <Notice error={error} loading={isLoading} empty={!services.length && 'Nenhum serviço disponível para este usuário.'} />
-      <form className="card form-card" onSubmit={event => {
-        event.preventDefault()
-        const fields = new FormData(event.currentTarget)
-        save.mutate({
-          prompt: fields.get('prompt'), serviceId: fields.get('service'), type, required: fields.has('required'),
-          ...(choice && { options: fields.get('options').split(/\r?\n/).map(value => value.trim()).filter(Boolean) }),
-        })
-      }}>
-        <label className="field">Texto da pergunta<textarea name="prompt" rows="3" minLength={10} maxLength={500} required /></label>
+    <form className="card form-card" onSubmit={event => {
+      event.preventDefault()
+      const fields = new FormData(event.currentTarget)
+      save.mutate({
+        prompt: fields.get('prompt'), type, required: fields.has('required'),
+        ...(entry ? { version: entry.version, changeReason: fields.get('changeReason') } : { serviceId: fields.get('service') }),
+        ...(choice && { options: fields.get('options').split(/\r?\n/).map(value => value.trim()).filter(Boolean) }),
+      })
+    }}>
+      <label className="field">Texto da pergunta<textarea name="prompt" rows="3" minLength={10} maxLength={500} required defaultValue={entry?.prompt} /></label>
+      {entry ? <p><strong>Serviço:</strong> {entry.services || 'Geral'}</p> :
         <label className="field">Serviço<select name="service" defaultValue="" required><option value="" disabled>Selecione um serviço</option>
           {services.map(service => <option key={service.id} value={service.id}>{service.sectorName} · {service.name}</option>)}
-        </select></label>
-        <label className="field">Tipo<select value={type} onChange={event => setType(event.target.value)}>
-          {Object.entries(questionTypes).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-        </select></label>
-        {choice && <label className="field">Opções, uma por linha<textarea name="options" rows="4" required maxLength={1010} /></label>}
-        <label className="checkbox-field"><input type="checkbox" name="required" /> Resposta obrigatória</label>
-        <Notice error={save.error} />
-        <div className="toolbar"><Link className="secondary" to={sector ? '/setor/perguntas' : '/admin/perguntas'}>Cancelar</Link>
-          <button className="primary" disabled={save.isPending || !services.length}>{save.isPending ? 'Enviando…' : 'Enviar para aprovação'}</button></div>
-      </form>
+        </select></label>}
+      <label className="field">Tipo<select value={type} onChange={event => setType(event.target.value)}>
+        {Object.entries(questionTypes).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+      </select></label>
+      {choice && <label className="field">Opções, uma por linha<textarea name="options" rows="4" required maxLength={1010}
+        defaultValue={entry?.type?.endsWith('_choice') ? entry.options.join('\n') : ''} /></label>}
+      <label className="checkbox-field"><input type="checkbox" name="required" defaultChecked={Boolean(entry?.required)} /> Resposta obrigatória</label>
+      {entry && <label className="field">Motivo da alteração<textarea name="changeReason" required minLength={3} maxLength={500} rows="2" /></label>}
+      <Notice error={save.error} />
+      <div className="toolbar"><Link className="secondary" to={home}>Cancelar</Link>
+        <button className="primary" disabled={save.isPending || (!entry && !services.length)}>{save.isPending ? 'Salvando…' : entry ? 'Salvar nova versão' : 'Enviar para aprovação'}</button></div>
+    </form>
+  )
+}
+
+export function NewQuestion({ sector = false }) {
+  const { id } = useParams()
+  const home = sector ? '/setor/perguntas' : '/admin/perguntas'
+  const { data, error, isLoading } = useQuery({
+    queryKey: id ? ['question-detail', id] : ['question-services'],
+    queryFn: () => api.get(id ? '/questions/' + id : '/questions/services').then(unwrap),
+    staleTime: 0,
+  })
+  const entry = id ? data : null
+  const services = id ? [] : data ?? []
+  const canEdit = !id || entry?.canEdit
+  return (
+    <AdminLayout>
+      <header className="section-heading"><h1>{id ? 'Editar pergunta' : 'Nova pergunta'}</h1>
+        <p>{id ? 'Cada edição cria uma versão. Pesquisas já iniciadas preservam as perguntas originais.' : 'A pergunta fica pendente até a análise da administração.'}</p>
+      </header>
+      <Notice error={error} loading={isLoading} empty={data && (!canEdit ? 'O status da pergunta não permite edição por este perfil.' : !id && !services.length && 'Nenhum serviço disponível para este usuário.')} />
+      {data && canEdit && <QuestionForm key={id ? entry.version : 'new'} entry={entry} services={services} home={home} />}
+      {id && !canEdit && <Link to={home}>Voltar para perguntas</Link>}
     </AdminLayout>
   )
 }
