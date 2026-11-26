@@ -9,14 +9,19 @@ export function useDashboard() {
   const queryClient = useQueryClient()
   const socketUrl = import.meta.env.VITE_SOCKET_URL
   useEffect(() => {
-    if (!socketUrl) return
-    const socket = io(socketUrl)
-    socket.on('dashboard:update', () => queryClient.invalidateQueries({ queryKey }))
+    const token = sessionStorage.getItem('fhdod_token')
+    if (!socketUrl || !token) return
+    const socket = io(socketUrl, { auth: { token } })
+    socket.on('dashboard:update', () => {
+      queryClient.invalidateQueries({ queryKey })
+      queryClient.invalidateQueries({ queryKey: ['dashboard-dimension'] })
+    })
     return () => socket.disconnect()
   }, [queryClient, socketUrl])
 
   return useQuery({
     queryKey,
     queryFn: () => api.get('/admin/dashboard/overview').then(unwrap),
+    refetchInterval: 30000,
   })
 }
