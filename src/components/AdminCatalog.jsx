@@ -123,10 +123,50 @@ function CatalogForm({ resource, entry, lists, onCancel, onSaved }) {
   )
 }
 
+
+function ServiceStagesForm({ service, close, saved }) {
+  const client = useQueryClient()
+  const query = useQuery({queryKey:['service-stage-editor',service.id],queryFn:async()=>{
+    const [all,active] = await Promise.all([referenceList('stages'),surveyService.stages(service.id)])
+    return { all:all.filter(item=>item.is_active), active:active.map(item=>item.id) }
+  }})
+  const save=useMutation({
+    mutationFn:stageIds=>api.put('/admin/services/'+service.id+'/stages',{stageIds}),
+    onSuccess:async response=>{
+      await Promise.all([client.invalidateQueries({queryKey:['service-stages']}),client.invalidateQueries({queryKey:['service-stage-editor']}),
+        client.invalidateQueries({queryKey:['question-service-config',service.id]})])
+      saved(response)
+    },
+  })
+  return <section className="card form-card" aria-label="Etapas da jornada">
+    <h3>Etapas de {service.name}</h3><Notice error={query.error||save.error} loading={query.isLoading}/>
+    {query.data&&<OrderedStages options={query.data.all} initial={query.data.active} close={close} save={ids=>save.mutate(ids)} busy={save.isPending}/>}
+    {!query.data&&<button type="button" className="secondary" onClick={close}>Fechar</button>}
+  </section>
+}
+
+function OrderedStages({ options, initial, close, save, busy }) {
+  const [selected,setSelected]=useState(initial)
+  return <form onSubmit={event=>{event.preventDefault();save(selected)}}>
+    <fieldset className="journey"><legend>Etapas ativas no serviço</legend>
+      <p>Marque na ordem do atendimento. Desmarque e marque novamente para mover uma etapa ao fim.</p>
+      {options.map(item=><label key={item.id} className="checkbox-field">
+        <input type="checkbox" checked={selected.includes(item.id)}
+          onChange={event=>setSelected(event.target.checked?[...selected,item.id]:selected.filter(id=>id!==item.id))}/>
+        {item.name}{selected.includes(item.id)&&' · '+(selected.indexOf(item.id)+1)+'ª etapa'}
+      </label>)}
+      {!options.length&&<p>Cadastre uma etapa ativa para vinculá-la ao serviço.</p>}
+    </fieldset>
+    <div className="toolbar"><button type="button" className="secondary" onClick={close}>Cancelar</button>
+      <button className="primary" disabled={busy}>{busy?'Salvando…':'Salvar etapas'}</button></div>
+  </form>
+}
+
 export function AdminCatalog() {
   const client = useQueryClient()
   const [resource, setResource] = useState('sectors')
   const [filters, setFilters] = useState({ search: '', status: '', page: 1 })
+  const [serviceStages,setServiceStages]=useState(null)
   const [surveySector, setSurveySector] = useState(null)
   const [editor, setEditor] = useState(null)
   const [confirm, setConfirm] = useState(null)
@@ -162,6 +202,7 @@ export function AdminCatalog() {
 
   async function refresh(result) {
     setMessage(result.message)
+    setServiceStages(null)
     setSurveySector(null)
     setEditor(null)
     setConfirm(null)
@@ -184,6 +225,7 @@ export function AdminCatalog() {
         {Object.entries(resources).map(([name, config]) => (
           <button key={name} type="button" className="secondary" aria-pressed={resource === name} disabled={status.isPending} onClick={() => {
             setResource(name)
+            setServiceStages(null)
             setSurveySector(null)
             setFilters({ search: '', status: '', page: 1 })
             setEditor(null)
@@ -202,6 +244,7 @@ export function AdminCatalog() {
         {(editable||manageAccess) && <button className="primary" type="button" disabled={status.isPending} onClick={() => { setEditor({}); setMessage(''); setConfirm(null) }}>{manageAccess?'Nova conta':'Novo registro'}</button>}
       </div>
       <Success message={message} />
+      {serviceStages&&<ServiceStagesForm key={serviceStages.id} service={serviceStages} close={()=>setServiceStages(null)} saved={refresh}/>}
       {surveySector && <SectorSurveyLink key={surveySector.id} sector={surveySector} close={() => setSurveySector(null)} />}
       {editor && manageAccess && <AccountAccess key={editor.id??'new'} record={editor.id?editor:null} close={()=>setEditor(null)} saved={refresh}/>}
       {editor && !manageAccess && <>
@@ -229,6 +272,8 @@ export function AdminCatalog() {
             {hasStatus && <td><span className={'badge ' + (row.is_active ? '' : 'status-inactive')}>{row.is_active ? 'Ativo' : 'Inativo'}</span></td>}
             {manageAccess&&<td><button type="button" className="secondary" onClick={()=>{setEditor(row);setMessage('')}}>Gerenciar acesso</button></td>}
             {editable && <td><div className="row-actions">
+              {resource==='services'&&Boolean(row.is_active)&&<button type="button" className="secondary"
+                onClick={()=>{setServiceStages(row);setEditor(null);setConfirm(null)}}>Etapas da jornada</button>}
               {resource === 'sectors' && Boolean(row.is_active) && <button type="button" className="secondary" onClick={() => { setSurveySector(row); setEditor(null); setConfirm(null) }}>Link e QR Code</button>}
               <button type="button" className="secondary" onClick={() => { setEditor(row); setConfirm(null); setMessage('') }}>Editar</button>
               <button type="button" className="secondary" onClick={() => { setConfirm(row); setEditor(null); setMessage(''); status.reset() }}>{row.is_active ? 'Arquivar' : 'Reativar'}</button>

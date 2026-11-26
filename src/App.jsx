@@ -37,7 +37,7 @@ function Attendance({sectorId}){
   const shift=shifts.data?.find(item=>item.id===shiftId);
   const choose=()=>{
     if(!selectedService||!shift)return;
-    const attendance={id:selected.id,name:selected.name,serviceId:selectedService.id,serviceName:selectedService.name,shiftId:shift.id,shiftName:shift.name,attendanceDate:date||undefined,stageIds:journey.data?.length?stageIds:undefined,attendanceKey:crypto.randomUUID()};
+    const attendance={id:selected.id,name:selected.name,serviceId:selectedService.id,serviceName:selectedService.name,shiftId:shift.id,shiftName:shift.name,attendanceDate:date||undefined,stageIds,attendanceKey:crypto.randomUUID()};
     if(sectorId) beginSector(attendance);
     else update({attendances:[...survey.attendances,attendance]});
     nav('/pesquisa/outros-atendimentos');
