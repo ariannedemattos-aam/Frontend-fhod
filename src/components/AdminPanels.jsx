@@ -21,13 +21,14 @@ export function AdminLayout({ children }) {
   const navigate = useNavigate()
   const isAdmin = user?.role === 'UserAdmin'
   async function signOut() {
+    let logoutWarning
     try {
       await logout()
-    } catch {
-      // A sessão local é encerrada pelo AuthProvider mesmo se a API estiver indisponível.
+    } catch (error) {
+      logoutWarning = error.message
     } finally {
       queryClient.clear()
-      navigate('/login', { replace: true })
+      navigate('/login', { replace: true, state: { logoutWarning } })
     }
   }
   return (

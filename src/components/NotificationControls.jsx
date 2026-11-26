@@ -5,6 +5,7 @@ import { Bell, Check } from 'lucide-react'
 import { io } from 'socket.io-client'
 import { api, unwrap } from '../services/api'
 import { Notice, Success } from './AdminFeedback'
+import { useAuth } from '../contexts/AuthContext'
 
 const notifications = ['notifications']
 const date = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
@@ -17,15 +18,15 @@ export function NotificationBell() {
     queryKey: [...notifications, 'count'], queryFn: () => load({ limit: 1 }), refetchInterval: 30000,
   })
   const socketUrl = import.meta.env.VITE_SOCKET_URL
+  const { token } = useAuth()
   useEffect(() => {
-    const token = sessionStorage.getItem('fhdod_token')
     if (!socketUrl || !token) return undefined
     const socket = io(socketUrl.replace(/\/+$/, '') + '/notifications', { auth: { token } })
     const refresh = () => client.invalidateQueries({ queryKey: notifications })
     socket.on('connect', refresh)
     socket.on('notifications:update', refresh)
     return () => socket.disconnect()
-  }, [client, socketUrl])
+  }, [client, socketUrl, token])
   const unread = data?.unread ?? 0
   return <Link className="notification-bell" to="/notificacoes" aria-label={'Notificações: ' + unread + ' não lidas'}>
     <Bell size={20} aria-hidden="true" />{unread > 0 && <span aria-hidden="true">{unread > 99 ? '99+' : unread}</span>}
