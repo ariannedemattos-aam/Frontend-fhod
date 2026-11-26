@@ -10,7 +10,7 @@ import { useAuth } from '../contexts/AuthContext'
 const notifications = ['notifications']
 const date = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
 const load = (params) => api.get('/notifications', { params }).then(unwrap)
-const allowedLinks = new Set(['/admin/convites', '/admin/perguntas', '/setor/perguntas', '/admin/retornos'])
+const allowedLinks = new Set(['/admin/convites', '/admin/perguntas', '/setor/perguntas', '/admin/retornos', '/admin/ouvidoria'])
 
 export function NotificationBell() {
   const client = useQueryClient()

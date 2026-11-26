@@ -4,11 +4,12 @@ import { Link, NavLink, useLocation, useNavigate, useParams } from 'react-router
 import { Activity, ClipboardList, FileDown, FolderOpen, Link2, LogOut, MessageSquare, Monitor, PhoneCall, Star } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { api, unwrap } from '../services/api'
+import { can, labels } from '../services/profileAccess'
 import { useDashboard } from '../services/useDashboard'
 import { Notice, Pagination, SearchField, Success } from './AdminFeedback'
 import { NotificationBell } from './NotificationControls'
 
-const dimensions = { sectors: 'Setores', services: 'Serviços', stages: 'Etapas', teams: 'Equipes', shifts: 'Turnos' }
+const dimensions = { sectors: 'Setores', services: 'Serviços', stages: 'Etapas', teams: 'Equipes', shifts: 'Turnos', 'roster-teams': 'Equipes da escala' }
 const questionTypes = { rating: 'Avaliação de 1 a 5', text: 'Texto livre', single_choice: 'Escolha única', multiple_choice: 'Múltipla escolha' }
 const statuses = { pending: 'Pendente', active: 'Ativa', rejected: 'Rejeitada', approved: 'Aprovada', inactive: 'Inativa' }
 const numberFormat = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 })
@@ -19,7 +20,7 @@ export function AdminLayout({ children }) {
   const { logout, user } = useAuth()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
-  const isAdmin = user?.role === 'UserAdmin'
+  const sector = user?.role === 'UserSetor'
   async function signOut() {
     let logoutWarning
     try {
@@ -36,20 +37,22 @@ export function AdminLayout({ children }) {
       <aside className="side">
         <Link to="/" className="side-brand"><Activity size={22} aria-hidden="true" /> FHDOD Ouvidoria</Link>
         <nav aria-label="Menu de colaboradores">
-          {isAdmin && <NavLink to="/admin/dashboard"><Activity size={18} aria-hidden="true" /> Indicadores</NavLink>}
-          <NavLink to={isAdmin ? '/admin/perguntas' : '/setor/perguntas'}><ClipboardList size={18} aria-hidden="true" /> {isAdmin ? 'Perguntas' : 'Minhas propostas'}</NavLink>
-          {isAdmin && <NavLink to="/admin/cadastros"><FolderOpen size={18} aria-hidden="true" /> Cadastros</NavLink>}
-          {isAdmin && <NavLink to="/admin/avaliacoes"><Star size={18} aria-hidden="true" /> Avaliações</NavLink>}
-          <NavLink to={isAdmin ? '/admin/feedback' : '/setor/feedback'}><MessageSquare size={18} aria-hidden="true" /> Feedbacks</NavLink>
-          {isAdmin && <NavLink to="/admin/retornos"><PhoneCall size={18} aria-hidden="true" /> Retornos</NavLink>}
-          {isAdmin && <NavLink to="/admin/relatorios"><FileDown size={18} aria-hidden="true" /> Relatórios</NavLink>}
-          {isAdmin && <NavLink to="/admin/convites"><Link2 size={18} aria-hidden="true" /> Convites</NavLink>}
+          {can(user, 'dashboard.read') && <NavLink to="/admin/dashboard"><Activity size={18} aria-hidden="true" /> Indicadores</NavLink>}
+          {can(user, 'questions.read') && <NavLink to={sector ? '/setor/perguntas' : '/admin/perguntas'}><ClipboardList size={18} aria-hidden="true" /> {sector ? 'Minhas propostas' : 'Perguntas'}</NavLink>}
+          {can(user, 'users.manage') && <NavLink to="/admin/cadastros"><FolderOpen size={18} aria-hidden="true" /> Cadastros</NavLink>}
+          {can(user, 'surveys.read') && <NavLink to="/admin/avaliacoes"><Star size={18} aria-hidden="true" /> Avaliações</NavLink>}
+          {can(user, 'feedback.read') && <NavLink to={sector ? '/setor/feedback' : '/admin/feedback'}><MessageSquare size={18} aria-hidden="true" /> Feedbacks</NavLink>}
+          {can(user, 'roster.read') && <NavLink to="/admin/escalas"><ClipboardList size={18} aria-hidden="true" /> Escala mensal</NavLink>}
+          {can(user, 'ombudsman.manage') && <NavLink to="/admin/ouvidoria"><MessageSquare size={18} aria-hidden="true" /> Ouvidoria</NavLink>}
+          {can(user, 'return_requests.manage') && <NavLink to="/admin/retornos"><PhoneCall size={18} aria-hidden="true" /> Retornos</NavLink>}
+          {can(user, 'reports.export') && <NavLink to="/admin/relatorios"><FileDown size={18} aria-hidden="true" /> Relatórios</NavLink>}
+          {can(user, 'invitations.manage') && <NavLink to="/admin/convites"><Link2 size={18} aria-hidden="true" /> Convites</NavLink>}
           <Link to="/tvwall"><Monitor size={18} aria-hidden="true" /> Painel público</Link>
         </nav>
         <button className="side-exit" onClick={signOut}><LogOut size={18} aria-hidden="true" /> Sair</button>
       </aside>
       <main className="content">
-        <div className="topbar"><span>{user?.name}</span><div className="topbar-tools"><span className="badge">{isAdmin ? 'Administração' : 'Equipe de setor'}</span><NotificationBell /></div></div>
+        <div className="topbar"><span>{user?.name}</span><div className="topbar-tools"><span className="badge">{labels[user?.role] ?? 'Colaborador'}</span><NotificationBell /></div></div>
         {children}
       </main>
     </div>
@@ -59,9 +62,12 @@ export function AdminLayout({ children }) {
 export function Dashboard() {
   const summary = useDashboard()
   const [dimension, setDimension] = useState('sectors')
+  const [period, setPeriod] = useState({})
+  const byRoster = dimension === 'roster-teams'
+  const filters = byRoster ? period : undefined
   const { data = [], error, isLoading } = useQuery({
-    queryKey: ['dashboard-dimension', dimension],
-    queryFn: () => api.get('/admin/dashboard/' + dimension).then(unwrap),
+    queryKey: ['dashboard-dimension', dimension, filters],
+    queryFn: () => api.get('/admin/dashboard/' + dimension, { params: filters }).then(unwrap),
     refetchInterval: 30000,
   })
   const totals = summary.data
@@ -84,13 +90,23 @@ export function Dashboard() {
             {Object.entries(dimensions).map(([key, label]) => <option value={key} key={key}>{label}</option>)}
           </select></label>
         </div>
+        {byRoster && <>
+          <div className="toolbar">
+            <label className="field">Data do atendimento inicial<input type="date" value={period.from ?? ''} onChange={event=>setPeriod({...period,from:event.target.value||undefined})}/></label>
+            <label className="field">Data do atendimento final<input type="date" value={period.to ?? ''} onChange={event=>setPeriod({...period,to:event.target.value||undefined})}/></label>
+          </div>
+          <p>A nota geral é anônima e aparece a partir de três avaliações vinculadas à equipe.</p>
+        </>}
         <Notice error={error} loading={isLoading} empty={!data.length && 'Ainda não há respostas vinculadas a esta dimensão.'} />
         <div className="bar-list">
-          {data.map(({ label, responses, averageRating }, index) => (
-            <div className="bar-row" key={label + index}><span>{label}</span>
-              <progress aria-label={'Satisfação média de ' + label} max="5" value={Number(averageRating ?? 0)} />
-              <span className="bar-value">{averageRating == null ? 'Sem nota' : format(averageRating) + '/5'} · {responses} {responses === 1 ? 'resposta' : 'respostas'}</span></div>
-          ))}
+          {data.map((row, index) => {
+            const note = byRoster ? row.averageOverall : row.averageRating
+            const count = byRoster ? row.evaluations : row.responses
+            const scale = byRoster ? 10 : 5
+            return <div className="bar-row" key={row.id ?? row.label + index}><span>{row.label}</span>
+              {note == null ? <span>—</span> : <progress aria-label={'Satisfação média de ' + row.label} max={scale} value={Number(note)} />}
+              <span className="bar-value">{note == null ? 'Sem nota' : format(note) + '/' + scale} · {count} {byRoster?'avaliação(ões)':count===1?'resposta':'respostas'}</span></div>
+          })}
         </div>
       </section>
     </AdminLayout>
@@ -202,6 +218,15 @@ function QuestionForm({ entry, services, home }) {
   const client = useQueryClient()
   const [type, setType] = useState(entry?.type ?? 'rating')
   const choice = type.endsWith('_choice')
+  const [serviceId,setServiceId]=useState(entry?.serviceId??'')
+  const [stage,setStage]=useState(entry?.stageId??'')
+  const [questionId,setQuestionId]=useState(entry?.rule?.questionId??'')
+  const [option,setOption]=useState(entry?.rule?.value??'')
+  const config=useQuery({queryKey:['question-service-config',serviceId],enabled:Boolean(serviceId),
+    queryFn:()=>api.get('/questions/services/'+serviceId+'/configuration').then(unwrap)})
+  const candidates=(config.data?.questions??[]).filter(q=>(!q.stageId||q.stageId===stage)&&(!entry||q.position<entry.position))
+  const prior=candidates.find(q=>q.id===questionId)
+  const pendingConfig=Boolean(serviceId)&&!config.data
   const save = useMutation({
     mutationFn: data => entry ? api.put('/questions/' + entry.id, data) : api.post('/questions', data),
     onSuccess: async response => {
@@ -215,15 +240,31 @@ function QuestionForm({ entry, services, home }) {
       const fields = new FormData(event.currentTarget)
       save.mutate({
         prompt: fields.get('prompt'), type, required: false,
-        ...(entry ? { version: entry.version, changeReason: fields.get('changeReason') } : { serviceId: fields.get('service') }),
+        ...(entry ? { version: entry.version, changeReason: fields.get('changeReason') } : { serviceId, stageId:stage||null }),
+        ...(questionId&&prior&&option?{rule:{questionId,value:option}}:entry?.rule&&!questionId?{rule:null}:{}),
         ...(choice && { options: fields.get('options').split(/\r?\n/).map(value => value.trim()).filter(Boolean) }),
       })
     }}>
       <label className="field">Texto da pergunta<textarea name="prompt" rows="3" minLength={10} maxLength={500} required defaultValue={entry?.prompt} /></label>
       {entry ? <p><strong>Serviço:</strong> {entry.services || 'Geral'}</p> :
-        <label className="field">Serviço<select name="service" defaultValue="" required><option value="" disabled>Selecione um serviço</option>
+        <label className="field">Serviço<select name="service" value={serviceId} onChange={event=>{setServiceId(event.target.value);setStage('');setQuestionId('');setOption('')}} required><option value="" disabled>Selecione um serviço</option>
           {services.map(service => <option key={service.id} value={service.id}>{service.sectorName} · {service.name}</option>)}
         </select></label>}
+      <Notice error={config.error} loading={config.isLoading}/>
+      {config.data&&<>
+        {!entry&&<label className="field">Etapa da jornada<select value={stage} onChange={event=>{setStage(event.target.value);setQuestionId('');setOption('')}}>
+          <option value="">Pergunta geral do serviço</option>{config.data.stages.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}
+        </select></label>}
+        {entry&&<p>Etapa {config.data.stages.find(item=>item.id===stage)?.name??'Geral'}</p>}
+        <label className="field">Mostrar após resposta anterior<select value={questionId} onChange={event=>{setQuestionId(event.target.value);setOption('')}}>
+          <option value="">Sem condição</option>
+          {questionId&&!prior&&<option value={questionId}>Condição atual indisponível</option>}
+          {candidates.map(q=><option value={q.id} key={q.id}>{q.prompt}</option>)}
+        </select></label>
+        {prior&&<label className="field">Resposta necessária para mostrar esta pergunta<select value={option} onChange={event=>setOption(event.target.value)} required>
+          <option value="">Selecione</option>{prior.options.map(item=><option value={item.value} key={item.value}>{item.label}</option>)}
+        </select></label>}
+      </>}
       <label className="field">Tipo<select value={type} onChange={event => setType(event.target.value)}>
         {Object.entries(questionTypes).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
       </select></label>
@@ -233,7 +274,7 @@ function QuestionForm({ entry, services, home }) {
       {entry && <label className="field">Motivo da alteração<textarea name="changeReason" required minLength={3} maxLength={500} rows="2" /></label>}
       <Notice error={save.error} />
       <div className="toolbar"><Link className="secondary" to={home}>Cancelar</Link>
-        <button className="primary" disabled={save.isPending || (!entry && !services.length)}>{save.isPending ? 'Salvando…' : entry ? 'Salvar nova versão' : 'Enviar para aprovação'}</button></div>
+        <button className="primary" disabled={save.isPending || pendingConfig || (Boolean(prior)&&!option) || (!entry && !services.length)}>{save.isPending ? 'Salvando…' : entry ? 'Salvar nova versão' : 'Enviar para aprovação'}</button></div>
     </form>
   )
 }

@@ -240,12 +240,14 @@ function ContactReveal({ id, close }) {
 
 export function ReturnsPanel() {
   const client = useQueryClient()
-  const [filters, setFilters] = useState({ status: 'open' })
+  const [linked, setLinked] = useSearchParams()
+  const requestId = linked.get('retorno')
+  const [filters, setFilters] = useState(requestId ? {} : { status: 'open' })
   const [version, resetForm] = useState(0)
   const [contact, setContact] = useState('')
   const [confirm, setConfirm] = useState(null)
   const [message, setMessage] = useState('')
-  const view = usePagedView('return-requests', '/admin/return-requests', filters)
+  const view = usePagedView('return-requests', '/admin/return-requests', requestId ? { ...filters, requestId } : filters)
   const status = useMutation({
     mutationFn: item => api.patch('/admin/return-requests/' + item.id + '/status', { status: nextReturn[item.status] }),
     onSuccess: async result => {
@@ -255,7 +257,7 @@ export function ReturnsPanel() {
       await client.invalidateQueries({ queryKey: ['return-requests'] })
     },
   })
-  const apply = params => { setFilters(params); view.setPage(1); setContact(''); setConfirm(null); resetForm(value => value + 1) }
+  const apply = params => { setLinked({}); setFilters(params); view.setPage(1); setContact(''); setConfirm(null); resetForm(value => value + 1) }
   return <AdminLayout>
     <header className="section-heading"><h1>Solicitações de retorno</h1><p>Acompanhe a situação de cada pedido. O contato é exibido somente sob solicitação.</p></header>
     <form className="card analysis-filters" key={version} aria-label="Filtros" onSubmit={event => { event.preventDefault(); apply(readFields(event.currentTarget)) }}>

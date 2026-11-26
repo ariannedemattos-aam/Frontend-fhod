@@ -136,3 +136,21 @@ button:disabled{opacity:.64;cursor:not-allowed}
 .invitation-used{background:#eaf4fa;color:var(--navy)}
 .invitation-expired{background:#fff3cd;color:#604a00}
 @media(max-width:700px){.invitation-result{grid-template-columns:1fr}.topbar-tools{gap:6px}}
+
+/* Formulário público e navegação assistiva */
+.rating-field,.journey{border:0;padding:0;margin:16px 0;min-width:0}
+.journey legend{font-weight:700;color:var(--navy)}
+.rate{display:flex;align-items:center;justify-content:center;gap:6px;flex-direction:column;font-size:1rem;cursor:pointer;min-height:72px}
+.rate:focus-within,.choice:focus-within{outline:3px solid var(--blue);outline-offset:3px}
+.rate input,.choice input,.checkbox-field input{accent-color:var(--blue);width:1.2rem;height:1.2rem;flex:none}
+.rating-general .rate{min-height:56px;flex-direction:row}
+.public .text-button{min-height:44px}
+.public-exit{margin-top:24px}
+.public .question-text{border:1px solid #65748a;border-radius:10px;padding:12px;background:#fff;color:var(--ink)}
+.public :is(button,a,input,textarea,select):focus-visible{outline-color:var(--blue)}
+.public .primary:focus-visible{outline-offset:4px}
+@media(max-width:700px){
+  .rate{flex-direction:row;justify-content:flex-start;min-height:54px}
+  .rating-general{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .rating-general .rate{justify-content:center}
+}

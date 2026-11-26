@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { AccountAccess } from './AccountAccess'
 import { AdminLayout } from './AdminPanels'
 import { Notice, Pagination, SearchField, Success } from './AdminFeedback'
 import { api, unwrap } from '../services/api'
@@ -132,6 +133,7 @@ export function AdminCatalog() {
   const [message, setMessage] = useState('')
   const confirmation = useRef(null)
   const entry = resources[resource]
+  const manageAccess = resource === 'users'
   const editable = Boolean(entry.fields)
   const hasStatus = editable || resource === 'users'
   const query = useQuery({
@@ -197,11 +199,12 @@ export function AdminCatalog() {
         {hasStatus && <label className="field">Status<select value={filters.status} onChange={event => updateFilters({ status: event.target.value })}>
           <option value="">Todos</option><option value="active">Ativos</option><option value="inactive">Inativos</option>
         </select></label>}
-        {editable && <button className="primary" type="button" disabled={status.isPending} onClick={() => { setEditor({}); setMessage(''); setConfirm(null) }}>Novo registro</button>}
+        {(editable||manageAccess) && <button className="primary" type="button" disabled={status.isPending} onClick={() => { setEditor({}); setMessage(''); setConfirm(null) }}>{manageAccess?'Nova conta':'Novo registro'}</button>}
       </div>
       <Success message={message} />
       {surveySector && <SectorSurveyLink key={surveySector.id} sector={surveySector} close={() => setSurveySector(null)} />}
-      {editor && <>
+      {editor && manageAccess && <AccountAccess key={editor.id??'new'} record={editor.id?editor:null} close={()=>setEditor(null)} saved={refresh}/>}
+      {editor && !manageAccess && <>
         {linked && <Notice error={references.error} loading={references.isLoading} />}
         {(!linked || references.data) && <CatalogForm key={editor.id ?? 'new'} entry={editor.id ? editor : null} resource={resource}
           lists={references.data ?? {}} onCancel={() => setEditor(null)} onSaved={refresh} />}
@@ -220,10 +223,11 @@ export function AdminCatalog() {
       <Notice error={query.error} loading={query.isLoading} empty={table?.data.length === 0 && 'Nenhum registro encontrado.'} />
       {table?.data.length > 0 && <div className="table-scroll" tabIndex={0} role="region" aria-label={'Tabela de ' + entry.label}>
         <table className="table">
-          <thead><tr><th scope="col">Nome</th>{hasStatus && <th scope="col">Status</th>}{editable && <th scope="col">Ações</th>}</tr></thead>
+          <thead><tr><th scope="col">Nome</th>{hasStatus && <th scope="col">Status</th>}{(editable||manageAccess) && <th scope="col">Ações</th>}</tr></thead>
           <tbody>{table.data.map(row => <tr key={row.id}>
             <td><strong>{row.name}</strong>{(entry.detail?.(row) || row.description || row.slug) && <small>{entry.detail?.(row) || row.description || row.slug}</small>}</td>
             {hasStatus && <td><span className={'badge ' + (row.is_active ? '' : 'status-inactive')}>{row.is_active ? 'Ativo' : 'Inativo'}</span></td>}
+            {manageAccess&&<td><button type="button" className="secondary" onClick={()=>{setEditor(row);setMessage('')}}>Gerenciar acesso</button></td>}
             {editable && <td><div className="row-actions">
               {resource === 'sectors' && Boolean(row.is_active) && <button type="button" className="secondary" onClick={() => { setSurveySector(row); setEditor(null); setConfirm(null) }}>Link e QR Code</button>}
               <button type="button" className="secondary" onClick={() => { setEditor(row); setConfirm(null); setMessage('') }}>Editar</button>
