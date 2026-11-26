@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useSearchParams } from 'react-router-dom'
 import { Download, FileSpreadsheet } from 'lucide-react'
 import { AdminLayout } from './AdminPanels'
 import { Notice, Pagination, Success } from './AdminFeedback'
@@ -56,6 +57,9 @@ function AnalysisFilters({ fields, apply, type, options }) {
         </select></label>
         <label className="field">Nota da resposta<select name="score" defaultValue={fields.score ?? ''}>
           <option value="">Todas</option>{[1, 2, 3, 4, 5].map(score => <option key={score} value={score}>{score}</option>)}
+        </select></label>
+        <label className="field">Nota geral até<select name="overallMax" defaultValue={fields.overallMax ?? ''}>
+          <option value="">Todas</option>{Array.from({ length: 11 }, (_, score) => <option key={score} value={score}>{score}/10</option>)}
         </select></label>
         {type === 'feedback' && <label className="field">Tipo<select name="kind" defaultValue={fields.kind ?? ''}>
           <option value="">Todos</option>{Object.entries(feedbackKinds).map(([kind, label]) => <option key={kind} value={kind}>{label}</option>)}
@@ -150,13 +154,18 @@ function EvaluationDetail({ id, filters, close }) {
 
 export function EvaluationsPanel({ report = false }) {
   const type = report ? 'report' : 'evaluation'
-  const [filters, setFilters] = useState({})
+  const [params, setParams] = useSearchParams()
+  const overallMax = params.get('overallMax')
+  const queryScore = /^(?:[0-9]|10)$/.test(overallMax) ? overallMax : ''
+  const [additionalFilters, setFilters] = useState({})
+  const filters = queryScore ? { ...additionalFilters, overallMax: queryScore } : additionalFilters
   const [filterVersion, resetForm] = useState(0)
   const [detail, setDetail] = useState('')
   const catalog = useQuery({ queryKey: ['analysis-options'], queryFn: () => api.get('/admin/analysis/options').then(unwrap) })
   const view = usePagedView('evaluations', '/admin/evaluations', filters)
-  function apply(params) {
-    setFilters(params)
+  function apply({ overallMax, ...criteria }) {
+    setParams(overallMax ? { overallMax } : {}, { replace: true })
+    setFilters(criteria)
     setDetail('')
     view.setPage(1)
     resetForm(version => version + 1)
@@ -165,7 +174,7 @@ export function EvaluationsPanel({ report = false }) {
     <header className="section-heading"><h1>{report ? 'Relatórios' : 'Avaliações'}</h1>
       <p>{report ? 'Exporte indicadores e contagens anônimas dos feedbacks.' : 'Consulte pesquisas concluídas. A média usa as notas individuais de 1 a 5.'}</p></header>
     <Notice error={catalog.error} loading={catalog.isLoading} />
-    <AnalysisFilters key={filterVersion} fields={filters} apply={apply} type={type} options={catalog.data} />
+    <AnalysisFilters key={queryScore + ":" + filterVersion} fields={filters} apply={apply} type={type} options={catalog.data} />
     <Notice error={view.error} loading={view.isLoading} empty={view.data && !view.pagination.total && 'Nenhuma avaliação corresponde aos filtros.'} />
     <Summary data={view.data?.summary} />
     <DownloadActions filters={filters} />

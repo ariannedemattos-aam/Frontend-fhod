@@ -214,7 +214,7 @@ function QuestionForm({ entry, services, home }) {
       event.preventDefault()
       const fields = new FormData(event.currentTarget)
       save.mutate({
-        prompt: fields.get('prompt'), type, required: fields.has('required'),
+        prompt: fields.get('prompt'), type, required: false,
         ...(entry ? { version: entry.version, changeReason: fields.get('changeReason') } : { serviceId: fields.get('service') }),
         ...(choice && { options: fields.get('options').split(/\r?\n/).map(value => value.trim()).filter(Boolean) }),
       })
@@ -229,7 +229,7 @@ function QuestionForm({ entry, services, home }) {
       </select></label>
       {choice && <label className="field">Opções, uma por linha<textarea name="options" rows="4" required maxLength={1010}
         defaultValue={entry?.type?.endsWith('_choice') ? entry.options.join('\n') : ''} /></label>}
-      <label className="checkbox-field"><input type="checkbox" name="required" defaultChecked={Boolean(entry?.required)} /> Resposta obrigatória</label>
+      <p>Esta pergunta será opcional na pesquisa pública.</p>
       {entry && <label className="field">Motivo da alteração<textarea name="changeReason" required minLength={3} maxLength={500} rows="2" /></label>}
       <Notice error={save.error} />
       <div className="toolbar"><Link className="secondary" to={home}>Cancelar</Link>

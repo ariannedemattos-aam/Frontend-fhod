@@ -3,6 +3,54 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AdminLayout } from './AdminPanels'
 import { Notice, Pagination, SearchField, Success } from './AdminFeedback'
 import { api, unwrap } from '../services/api'
+import { surveyService } from '../services/surveyService'
+
+function SectorSurveyLink({ sector, close }) {
+  const link = new URL('/pesquisa/setor/' + sector.id, window.location.origin).href
+  const [qr, setQr] = useState('')
+  const [qrError, setQrError] = useState(null)
+  const [copyError, setCopyError] = useState(null)
+  const [message, setMessage] = useState('')
+  const services = useQuery({ queryKey: ['survey-sectors', 'services', sector.id], queryFn: () => surveyService.services(sector.id) })
+  useEffect(() => {
+    let active = true
+    import('qrcode')
+      .then(({ default: QRCode }) => QRCode.toDataURL(link, { width: 300, margin: 3, errorCorrectionLevel: 'M' }))
+      .then(image => { if (active) setQr(image) })
+      .catch(() => { if (active) setQrError(new Error('Não foi possível gerar o QR Code.')) })
+    return () => { active = false }
+  }, [link])
+
+  async function copy() {
+    setCopyError(null)
+    setMessage('')
+    try {
+      await navigator.clipboard.writeText(link)
+      setMessage('Link copiado.')
+    } catch {
+      setCopyError(new Error('Selecione o endereço no campo do link para copiá-lo.'))
+    }
+  }
+
+  return <section className="card invitation-result" aria-label="Pesquisa do setor">
+    <div>
+      <h3>Pesquisa de {sector.name}</h3>
+      <p>O mesmo endereço pode ser usado por várias pessoas e abre a pesquisa neste setor.</p>
+      <Notice error={services.error} loading={services.isLoading} empty={services.data?.length === 0 && 'Cadastre um serviço ativo neste setor antes de divulgar a pesquisa.'} />
+      <label className="field">Link do setor<input readOnly value={link} onFocus={event => event.currentTarget.select()} /></label>
+      <div className="toolbar">
+        <button type="button" className="secondary" onClick={copy}>Copiar link</button>
+        <a className="secondary" href={link} target="_blank" rel="noopener">Abrir pesquisa</a>
+        <button type="button" className="secondary" onClick={close}>Fechar</button>
+      </div>
+      <Notice error={qrError || copyError} /><Success message={message} />
+    </div>
+    {qr && <figure className="invitation-qr">
+      <img src={qr} width="250" height="250" alt={'QR Code da pesquisa de ' + sector.name} />
+      <figcaption><a className="secondary" href={qr} download={'pesquisa-' + sector.slug + '.png'}>Baixar QR Code</a></figcaption>
+    </figure>}
+  </section>
+}
 
 const resources = {
   sectors: { label: 'Setores', fields: ['slug'] },
@@ -78,6 +126,7 @@ export function AdminCatalog() {
   const client = useQueryClient()
   const [resource, setResource] = useState('sectors')
   const [filters, setFilters] = useState({ search: '', status: '', page: 1 })
+  const [surveySector, setSurveySector] = useState(null)
   const [editor, setEditor] = useState(null)
   const [confirm, setConfirm] = useState(null)
   const [message, setMessage] = useState('')
@@ -111,6 +160,7 @@ export function AdminCatalog() {
 
   async function refresh(result) {
     setMessage(result.message)
+    setSurveySector(null)
     setEditor(null)
     setConfirm(null)
     await Promise.all([
@@ -132,6 +182,7 @@ export function AdminCatalog() {
         {Object.entries(resources).map(([name, config]) => (
           <button key={name} type="button" className="secondary" aria-pressed={resource === name} disabled={status.isPending} onClick={() => {
             setResource(name)
+            setSurveySector(null)
             setFilters({ search: '', status: '', page: 1 })
             setEditor(null)
             setConfirm(null)
@@ -149,6 +200,7 @@ export function AdminCatalog() {
         {editable && <button className="primary" type="button" disabled={status.isPending} onClick={() => { setEditor({}); setMessage(''); setConfirm(null) }}>Novo registro</button>}
       </div>
       <Success message={message} />
+      {surveySector && <SectorSurveyLink key={surveySector.id} sector={surveySector} close={() => setSurveySector(null)} />}
       {editor && <>
         {linked && <Notice error={references.error} loading={references.isLoading} />}
         {(!linked || references.data) && <CatalogForm key={editor.id ?? 'new'} entry={editor.id ? editor : null} resource={resource}
@@ -173,6 +225,7 @@ export function AdminCatalog() {
             <td><strong>{row.name}</strong>{(entry.detail?.(row) || row.description || row.slug) && <small>{entry.detail?.(row) || row.description || row.slug}</small>}</td>
             {hasStatus && <td><span className={'badge ' + (row.is_active ? '' : 'status-inactive')}>{row.is_active ? 'Ativo' : 'Inativo'}</span></td>}
             {editable && <td><div className="row-actions">
+              {resource === 'sectors' && Boolean(row.is_active) && <button type="button" className="secondary" onClick={() => { setSurveySector(row); setEditor(null); setConfirm(null) }}>Link e QR Code</button>}
               <button type="button" className="secondary" onClick={() => { setEditor(row); setConfirm(null); setMessage('') }}>Editar</button>
               <button type="button" className="secondary" onClick={() => { setConfirm(row); setEditor(null); setMessage(''); status.reset() }}>{row.is_active ? 'Arquivar' : 'Reativar'}</button>
             </div></td>}

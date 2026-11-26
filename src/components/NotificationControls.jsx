@@ -62,7 +62,7 @@ export function NotificationInbox() {
           {!item.readAt && <span className="badge">Não lida</span>}</div>
         <h2>{item.title}</h2><p>{item.message}</p>
         <div className="row-actions">
-          {allowedLinks.has(item.href) && <Link to={item.href}>Abrir seção</Link>}
+          {(allowedLinks.has(item.href) || /^\/admin\/avaliacoes\?overallMax=(?:[0-9]|10)$/.test(item.href)) && <Link to={item.href}>Abrir seção</Link>}
           {!item.readAt && <button className="secondary" type="button" onClick={() => mark.mutate(item.id)} disabled={mark.isPending}>Marcar como lida</button>}
         </div>
       </li>)}

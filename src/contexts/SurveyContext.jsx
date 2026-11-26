@@ -15,9 +15,10 @@ export function SurveyProvider({ children }) {
   function beginInvitation({ id, surveyToken, status }) {
     persist({ ...(survey.id === id ? survey : blank()), id, token: surveyToken, started: status === 'in_progress' })
   }
+  const beginSector = attendance => persist({ ...blank(), attendances: [attendance] })
   function clear() {
     sessionStorage.removeItem(key)
     setSurvey(blank())
   }
-  return <SurveyContext.Provider value={{ survey, update, beginInvitation, clear }}>{children}</SurveyContext.Provider>
+  return <SurveyContext.Provider value={{ survey, update, beginInvitation, beginSector, clear }}>{children}</SurveyContext.Provider>
 }
