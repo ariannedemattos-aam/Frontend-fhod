@@ -32,7 +32,7 @@ A demonstração usa dados fictícios na API, com mocks da interface desabilitad
 
 - [Requisitos](https://github.com/ariannedemattos-aam/backend-sah/blob/main/docs/requisitos.md), [arquitetura](https://github.com/ariannedemattos-aam/backend-sah/blob/main/docs/arquitetura-backend.md), [versionamento](https://github.com/ariannedemattos-aam/backend-sah/blob/main/docs/padroes-git.md) e [testes](https://github.com/ariannedemattos-aam/backend-sah/blob/main/docs/plano-e-relatorio-de-testes.md).
 - [Modelo de dados](https://github.com/ariannedemattos-aam/backend-sah/blob/main/docs/modelo-de-dados-e-requisitos.md), [padrões de banco](https://github.com/ariannedemattos-aam/backend-sah/blob/main/docs/padroes-banco-de-dados.md), [consultas](https://github.com/ariannedemattos-aam/backend-sah/blob/main/docs/mapeamento-classes-e-consultas.md) e [segurança/nuvem](https://github.com/ariannedemattos-aam/backend-sah/blob/main/docs/seguranca-e-nuvem.md).
-- [Guia visual](docs/guia-de-estilos.md), [capturas publicadas](docs/capturas/), [Swagger](https://github.com/ariannedemattos-aam/backend-sah/blob/main/docs/integration.md) e [Kanban retrospectivo](https://github.com/ariannedemattos-aam/backend-sah/blob/main/docs/kanban-retrospectivo.md). O quadro remoto aguarda permissão GitHub Projects.
+- [Guia visual](docs/guia-de-estilos.md), [capturas publicadas](docs/capturas/), [Swagger](https://github.com/ariannedemattos-aam/backend-sah/blob/main/docs/integration.md) e [Kanban retrospectivo no GitHub Projects](https://github.com/users/ariannedemattos-aam/projects/1/views/1).
 
 A avaliação manual em leitor de tela e a montagem de protótipo editável ficam para revisão posterior. A demonstração permanece de uma instituição.
 
